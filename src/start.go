@@ -17,7 +17,22 @@ func main() {
 		}
 		port = p
 	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "get working directory: %v\n", err)
+		os.Exit(1)
+	}
 	addr := fmt.Sprintf(":%d", port)
+	url := fmt.Sprintf("http://localhost:%d/", port)
+
+	fmt.Printf("sgo: static file server\n")
+	fmt.Printf("  directory: %s\n", cwd)
+	fmt.Printf("  URL:       %s\n", url)
+	fmt.Printf("  stop:      press Ctrl+C\n")
+
 	fs := http.FileServer(http.Dir("."))
-	http.ListenAndServe(addr, fs)
+	if err := http.ListenAndServe(addr, fs); err != nil {
+		fmt.Fprintf(os.Stderr, "listen on %s: %v\n", addr, err)
+		os.Exit(1)
+	}
 }

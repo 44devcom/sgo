@@ -29,3 +29,13 @@ Then open `http://localhost:<port>/` in your browser.
 | macOS (Apple Silicon) | `dist/darwin-arm64/sgo` | [download](https://github.com/44devcom/sgo/raw/refs/heads/master/dist/darwin-arm64/sgo) |
 | Windows (amd64) | `dist/windows-amd64/sgo.exe` | [download](https://github.com/44devcom/sgo/raw/refs/heads/master/dist/windows-amd64/sgo.exe) |
 
+## macOS
+
+Open the Terminal application on your Mac. You can do this by pressing Cmd + Space, typing Terminal, and pressing Enter. Then copy and paste the following commands into the terminal window to run the application from your Downloads folder.
+
+```bash
+cd ~/Downloads
+chmod +x ./sgo
+xattr -d com.apple.quarantine ./sgo
+./sgo
+```
