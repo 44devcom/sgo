@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,6 +11,93 @@ import (
 	"path/filepath"
 	"testing"
 )
+
+func mustIPNet(t *testing.T, cidr string) net.Addr {
+	t.Helper()
+	_, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return ipnet
+}
+
+func TestFindLANIPv4FromAddrs(t *testing.T) {
+	tests := []struct {
+		name  string
+		addrs []net.Addr
+		want  string
+	}{
+		{
+			name: "prefers private over loopback and public",
+			addrs: []net.Addr{
+				mustIPNet(t, "127.0.0.1/32"),
+				mustIPNet(t, "203.0.113.1/32"),
+				mustIPNet(t, "192.168.1.10/32"),
+			},
+			want: "192.168.1.10",
+		},
+		{
+			name: "loopback only",
+			addrs: []net.Addr{
+				mustIPNet(t, "127.0.0.1/8"),
+			},
+			want: "",
+		},
+		{
+			name: "ipv6 only",
+			addrs: []net.Addr{
+				mustIPNet(t, "fe80::1/64"),
+			},
+			want: "",
+		},
+		{
+			name: "private over link-local",
+			addrs: []net.Addr{
+				mustIPNet(t, "169.254.12.34/32"),
+				mustIPNet(t, "10.0.0.5/32"),
+			},
+			want: "10.0.0.5",
+		},
+		{
+			name: "public fallback",
+			addrs: []net.Addr{
+				mustIPNet(t, "203.0.113.9/32"),
+			},
+			want: "203.0.113.9",
+		},
+		{
+			name:  "empty",
+			addrs: nil,
+			want:  "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := findLANIPv4FromAddrs(tt.addrs)
+			if tt.want == "" {
+				if got != nil {
+					t.Fatalf("got %v, want nil", got)
+				}
+				return
+			}
+			if got == nil {
+				t.Fatal("got nil, want IP")
+			}
+			if got.String() != tt.want {
+				t.Fatalf("got %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatLANURL(t *testing.T) {
+	got := formatLANURL(net.ParseIP("192.168.1.42"), 5678)
+	want := "http://192.168.1.42:5678/"
+	if got != want {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+}
 
 func TestResolveRootDir(t *testing.T) {
 	base := t.TempDir()

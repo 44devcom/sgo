@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -104,6 +105,74 @@ func newFileServer(root string) http.Handler {
 	return http.FileServer(http.Dir(root))
 }
 
+func isPrivateIPv4(ip net.IP) bool {
+	ip4 := ip.To4()
+	if ip4 == nil {
+		return false
+	}
+	switch {
+	case ip4[0] == 10:
+		return true
+	case ip4[0] == 172 && ip4[1] >= 16 && ip4[1] <= 31:
+		return true
+	case ip4[0] == 192 && ip4[1] == 168:
+		return true
+	}
+	return false
+}
+
+func isLinkLocalIPv4(ip net.IP) bool {
+	ip4 := ip.To4()
+	return ip4 != nil && ip4[0] == 169 && ip4[1] == 254
+}
+
+func lanIPv4Score(ip net.IP) int {
+	ip4 := ip.To4()
+	if ip4 == nil || ip.IsLoopback() {
+		return -1
+	}
+	if isPrivateIPv4(ip4) {
+		return 3
+	}
+	if isLinkLocalIPv4(ip4) {
+		return 1
+	}
+	return 2
+}
+
+func findLANIPv4FromAddrs(addrs []net.Addr) net.IP {
+	var best net.IP
+	bestScore := -1
+	for _, addr := range addrs {
+		ipnet, ok := addr.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		ip := ipnet.IP
+		score := lanIPv4Score(ip)
+		if score > bestScore {
+			bestScore = score
+			best = ip.To4()
+		}
+	}
+	if bestScore < 0 {
+		return nil
+	}
+	return best
+}
+
+func findLANIPv4() net.IP {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return nil
+	}
+	return findLANIPv4FromAddrs(addrs)
+}
+
+func formatLANURL(ip net.IP, port int) string {
+	return fmt.Sprintf("http://%s:%d/", ip, port)
+}
+
 func main() {
 	cfg, err := parseConfig(os.Args[1:])
 	if err != nil {
@@ -129,6 +198,9 @@ func main() {
 	fmt.Printf("sgo: static file server written in Go\n")
 	fmt.Printf("  DIR: %s\n", root)
 	fmt.Printf("  URL: %s\n", url)
+	if ip := findLANIPv4(); ip != nil {
+		fmt.Printf("  LAN: %s\n", formatLANURL(ip, cfg.port))
+	}
 	fmt.Printf("  Press Ctrl+C to stop\n")
 
 	if err := http.ListenAndServe(addr, newFileServer(root)); err != nil {

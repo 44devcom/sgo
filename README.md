@@ -10,7 +10,7 @@
 - **Smart default root** — serves the folder that contains the `sgo` binary (not the shell’s current working directory)
 - **Change root directory** — serve any path (required on Termux, when `sgo` is on `PATH`, or when the site lives elsewhere)
 - **Listens on all interfaces** — use `127.0.0.1` locally or `<host-ip>` from phones and other machines on the same network
-- **Startup summary** — prints resolved `DIR:` and `URL:` so you can confirm the right folder
+- **Startup summary** — prints resolved `DIR:`, `URL:`, and `LAN:` (when a LAN IPv4 is found) so you can confirm the right folder and copy a network URL
 - **Cross-platform builds** — Linux (amd64, arm64), macOS (Intel & Apple Silicon), Windows (amd64)
 
 ---
@@ -25,7 +25,7 @@
 | `./sgo -dir=/path/to/site` | Serve that directory |
 | `./sgo -port 8080 -dir="/path/with spaces"` | Custom port and root |
 
-Open `http://127.0.0.1:<port>/` in a browser. The server listens on all interfaces, so other devices on the same network can use `http://<host-ip>:<port>/`.
+Open `http://127.0.0.1:<port>/` in a browser. The server listens on all interfaces; at startup, **`LAN:`** prints a ready-to-use URL for other devices on the same network when a suitable IPv4 is found (otherwise use `http://<host-ip>:<port>/` manually).
 
 Check the **`DIR:`** line at startup. If a path with spaces was split (e.g. you see `.../My` instead of `.../My Project/site`), quote the path or use `-dir=`:
 
@@ -151,13 +151,13 @@ cd $env:USERPROFILE\Downloads
 .\sgo.exe -port 8080 -dir "C:\Users\me\My Project\site"
 ```
 
-Open `http://127.0.0.1:5678/` in a browser. Other devices on the LAN: `http://<pc-ip>:5678/`.
+Open `http://127.0.0.1:5678/` in a browser. Other devices on the LAN: use the **`LAN:`** line from startup, or `http://<pc-ip>:5678/` if it is not shown.
 
 ---
 
 ### Termux (Android)
 
-**Download:** [linux-arm64/sgo](https://github.com/44devcom/sgo/raw/refs/heads/master/dist/linux-arm64/sgo) (or use the [installer](#install) above).
+**Download:** [linux-arm64/sgo](https://github.com/44devcom/sgo/raw/refs/heads/master/dist/linux-arm64/sgo) (or use the [installer](#install) above). The arm64 Linux build is a **PIE** binary (`-buildmode=pie`) so Android accepts it — older builds may fail with `unexpected e_type: 2`.
 
 1. `termux-setup-storage` (once)
 2. Put your site under shared storage, e.g. `~/storage/downloads/my-site/`
