@@ -32,12 +32,8 @@ case "$RAW_OS" in
 esac
 
 DIST_ID="$OS-$ARCH"
-# Termux is Linux+aarch64 but needs the Android/Bionic binary (TLS alignment).
-if [ "$ARCH" = "arm64" ] && { [ -n "${TERMUX_VERSION:-}" ] || [ "${PREFIX:-}" = "/data/data/com.termux/files/usr" ]; }; then
-  DIST_ID="android-arm64"
-fi
 case "$DIST_ID" in
-  linux-amd64|linux-arm64|android-arm64|darwin-amd64|darwin-arm64) ;;
+  linux-amd64|linux-arm64|darwin-amd64|darwin-arm64) ;;
   *)
     echo "No binary for $DIST_ID"
     exit 1

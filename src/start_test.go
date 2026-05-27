@@ -186,32 +186,6 @@ func TestExecutableDir(t *testing.T) {
 	}
 }
 
-func TestResolveServePath(t *testing.T) {
-	t.Run("default uses executable dir", func(t *testing.T) {
-		got, err := resolveServePath(config{dir: ".", dirExplicit: false})
-		if err != nil {
-			t.Fatal(err)
-		}
-		want, err := executableDir()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got != want {
-			t.Fatalf("got %q, want %q", got, want)
-		}
-	})
-
-	t.Run("explicit dir", func(t *testing.T) {
-		got, err := resolveServePath(config{dir: "/tmp/foo", dirExplicit: true})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got != "/tmp/foo" {
-			t.Fatalf("got %q, want /tmp/foo", got)
-		}
-	})
-}
-
 func TestParseConfig(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -219,16 +193,14 @@ func TestParseConfig(t *testing.T) {
 		want    config
 		wantErr bool
 	}{
-		{"defaults", nil, config{port: 5678, dir: ".", dirExplicit: false}, false},
-		{"positional port", []string{"8080"}, config{port: 8080, dir: ".", dirExplicit: false}, false},
-		{"flag port", []string{"-port", "3000"}, config{port: 3000, dir: ".", dirExplicit: false}, false},
-		{"flag dir", []string{"-dir", "/tmp/foo"}, config{port: 5678, dir: "/tmp/foo", dirExplicit: true}, false},
-		{"dir equals form", []string{"-dir=/tmp/My Project"}, config{port: 5678, dir: "/tmp/My Project", dirExplicit: true}, false},
-		{"positional dir", []string{"/tmp/foo"}, config{port: 5678, dir: "/tmp/foo", dirExplicit: true}, false},
-		{"port and dir flags", []string{"-port", "9000", "-dir", "/srv/www"}, config{port: 9000, dir: "/srv/www", dirExplicit: true}, false},
+		{"defaults", nil, config{port: 5678}, false},
+		{"positional port", []string{"8080"}, config{port: 8080}, false},
+		{"rejected -port flag", []string{"-port", "3000"}, config{}, true},
+		{"unknown -dir flag", []string{"-dir", "/tmp"}, config{}, true},
+		{"positional path rejected", []string{"/tmp/foo"}, config{}, true},
 		{"invalid port positional", []string{"99999"}, config{}, true},
 		{"unquoted path splits into multiple args", []string{"/tmp/My", "Project", "site"}, config{}, true},
-		{"unexpected with explicit dir", []string{"-dir", "/tmp", "extra"}, config{}, true},
+		{"port with extra args", []string{"8080", "extra"}, config{}, true},
 	}
 
 	for _, tt := range tests {

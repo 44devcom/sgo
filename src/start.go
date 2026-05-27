@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -12,63 +11,27 @@ import (
 )
 
 type config struct {
-	port        int
-	dir         string
-	dirExplicit bool
+	port int
 }
 
 func parseConfig(args []string) (config, error) {
-	fs := flag.NewFlagSet("sgo", flag.ContinueOnError)
-	fs.SetOutput(os.Stderr)
+	const defaultPort = 5678
 
-	port := 5678
-	dir := "."
-	fs.IntVar(&port, "port", 5678, "HTTP listen port")
-	fs.StringVar(&dir, "dir", ".", "directory to serve")
-
-	if err := fs.Parse(args); err != nil {
-		return config{}, err
-	}
-
-	portExplicit := false
-	dirExplicit := false
-	fs.Visit(func(f *flag.Flag) {
-		switch f.Name {
-		case "port":
-			portExplicit = true
-		case "dir":
-			dirExplicit = true
+	switch len(args) {
+	case 0:
+		return config{port: defaultPort}, nil
+	case 1:
+		p, err := strconv.Atoi(args[0])
+		if err != nil {
+			return config{}, fmt.Errorf("unexpected arguments: %s", args[0])
 		}
-	})
-
-	pos := fs.Args()
-	if len(pos) == 1 && !portExplicit {
-		if p, err := strconv.Atoi(pos[0]); err == nil {
-			if p < 1 || p > 65535 {
-				return config{}, fmt.Errorf("invalid port: %d", p)
-			}
-			port = p
-			pos = nil
-		} else if !dirExplicit {
-			dir = pos[0]
-			dirExplicit = true
-			pos = nil
+		if p < 1 || p > 65535 {
+			return config{}, fmt.Errorf("invalid port: %d", p)
 		}
+		return config{port: p}, nil
+	default:
+		return config{}, fmt.Errorf("unexpected arguments: %s", strings.Join(args, " "))
 	}
-
-	if len(pos) > 0 {
-		return config{}, fmt.Errorf("unexpected arguments: %s (use -dir for a serve directory)", strings.Join(pos, " "))
-	}
-
-	if !dirExplicit {
-		dir = "."
-	}
-
-	if port < 1 || port > 65535 {
-		return config{}, fmt.Errorf("invalid port: %d", port)
-	}
-
-	return config{port: port, dir: dir, dirExplicit: dirExplicit}, nil
 }
 
 func executableDir() (string, error) {
@@ -81,13 +44,6 @@ func executableDir() (string, error) {
 		return "", fmt.Errorf("resolve executable: %w", err)
 	}
 	return filepath.Dir(exe), nil
-}
-
-func resolveServePath(cfg config) (string, error) {
-	if cfg.dirExplicit {
-		return cfg.dir, nil
-	}
-	return executableDir()
 }
 
 func resolveRootDir(dir string) (string, error) {
@@ -184,7 +140,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	servePath, err := resolveServePath(cfg)
+	servePath, err := executableDir()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
