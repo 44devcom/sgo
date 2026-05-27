@@ -11,8 +11,9 @@ import (
 )
 
 type config struct {
-	port int
-	dir  string
+	port        int
+	dir         string
+	dirExplicit bool
 }
 
 func parseConfig(args []string) (config, error) {
@@ -62,7 +63,26 @@ func parseConfig(args []string) (config, error) {
 		return config{}, fmt.Errorf("invalid port: %d", port)
 	}
 
-	return config{port: port, dir: dir}, nil
+	return config{port: port, dir: dir, dirExplicit: dirExplicit}, nil
+}
+
+func executableDir() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("locate executable: %w", err)
+	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		return "", fmt.Errorf("resolve executable: %w", err)
+	}
+	return filepath.Dir(exe), nil
+}
+
+func resolveServePath(cfg config) (string, error) {
+	if cfg.dirExplicit {
+		return cfg.dir, nil
+	}
+	return executableDir()
 }
 
 func resolveRootDir(dir string) (string, error) {
@@ -87,7 +107,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	root, err := resolveRootDir(cfg.dir)
+	servePath, err := resolveServePath(cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+
+	root, err := resolveRootDir(servePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)

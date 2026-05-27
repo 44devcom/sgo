@@ -66,6 +66,59 @@ func TestResolveRootDir(t *testing.T) {
 	}
 }
 
+func TestExecutableDir(t *testing.T) {
+	got, err := executableDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Dir(exe)
+	wantAbs, err := filepath.Abs(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gotAbs, err := filepath.Abs(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotAbs != wantAbs {
+		t.Fatalf("got %q, want %q", gotAbs, wantAbs)
+	}
+}
+
+func TestResolveServePath(t *testing.T) {
+	t.Run("default uses executable dir", func(t *testing.T) {
+		got, err := resolveServePath(config{dir: ".", dirExplicit: false})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want, err := executableDir()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != want {
+			t.Fatalf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("explicit dir", func(t *testing.T) {
+		got, err := resolveServePath(config{dir: "/tmp/foo", dirExplicit: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got != "/tmp/foo" {
+			t.Fatalf("got %q, want /tmp/foo", got)
+		}
+	})
+}
+
 func TestParseConfig(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -73,12 +126,12 @@ func TestParseConfig(t *testing.T) {
 		want    config
 		wantErr bool
 	}{
-		{"defaults", nil, config{port: 5678, dir: "."}, false},
-		{"positional port", []string{"8080"}, config{port: 8080, dir: "."}, false},
-		{"flag port", []string{"-port", "3000"}, config{port: 3000, dir: "."}, false},
-		{"flag dir", []string{"-dir", "/tmp/foo"}, config{port: 5678, dir: "/tmp/foo"}, false},
-		{"dir equals form", []string{"-dir=/tmp/My Project"}, config{port: 5678, dir: "/tmp/My Project"}, false},
-		{"port and dir flags", []string{"-port", "9000", "-dir", "/srv/www"}, config{port: 9000, dir: "/srv/www"}, false},
+		{"defaults", nil, config{port: 5678, dir: ".", dirExplicit: false}, false},
+		{"positional port", []string{"8080"}, config{port: 8080, dir: ".", dirExplicit: false}, false},
+		{"flag port", []string{"-port", "3000"}, config{port: 3000, dir: ".", dirExplicit: false}, false},
+		{"flag dir", []string{"-dir", "/tmp/foo"}, config{port: 5678, dir: "/tmp/foo", dirExplicit: true}, false},
+		{"dir equals form", []string{"-dir=/tmp/My Project"}, config{port: 5678, dir: "/tmp/My Project", dirExplicit: true}, false},
+		{"port and dir flags", []string{"-port", "9000", "-dir", "/srv/www"}, config{port: 9000, dir: "/srv/www", dirExplicit: true}, false},
 		{"invalid port positional", []string{"99999"}, config{}, true},
 		{"positional path without dir flag", []string{"/tmp/My", "Project", "site"}, config{}, true},
 		{"unexpected with explicit dir", []string{"-dir", "/tmp", "extra"}, config{}, true},

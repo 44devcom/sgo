@@ -4,7 +4,7 @@ A minimal static file server written in Go. It serves files from a directory ove
 
 ## Usage
 
-Serve the current working directory (default port **5678**):
+Serve the directory containing the `sgo` binary (default port **5678**):
 
 ```bash
 ./sgo
@@ -26,7 +26,7 @@ Then open `http://localhost:<port>/` in your browser.
 
 ### Serve directory
 
-By default, sgo serves the directory you run it from. To serve another folder (recommended when the path contains **spaces** or **non-ASCII** characters), use `-dir`:
+By default, sgo serves the **directory that contains the `sgo` executable** (not the shell’s current working directory). Place `sgo` next to your site files, or use `-dir` to serve another folder:
 
 ```bash
 ./sgo -dir=/Users/me/My Project/site
@@ -36,7 +36,7 @@ By default, sgo serves the directory you run it from. To serve another folder (r
 
 On macOS and in most shells, prefer **`-dir=/full/path`** (equals form) so the path is not split at spaces before sgo runs.
 
-Without `-dir`, sgo always serves the **current working directory** (where you run the command). Use `cd` with a quoted path, or pass `-dir`.
+Use `-dir` when `sgo` is on your `PATH` (for example `/usr/local/bin/sgo`) but the site lives elsewhere, or when you want a folder other than the executable’s directory.
 
 For both a custom directory and port, use flags:
 
@@ -44,14 +44,13 @@ For both a custom directory and port, use flags:
 ./sgo -port 8080 -dir="/path/with spaces"
 ```
 
-Startup prints the **resolved absolute path** as `directory:` — check that line if the wrong folder is served.
+Startup prints the **resolved absolute path** as `DIR:` — check that line if the wrong folder is served.
 
 ### Troubleshooting paths with spaces
 
-If `directory:` shows the parent of a folder whose name contains a space (e.g. you expected `.../My Project/site` but see `.../My`), the shell split the path. Fix it with quotes or `-dir=`:
+If `DIR:` shows the parent of a folder whose name contains a space (e.g. you expected `.../My Project/site` but see `.../My`), the shell split the path. Fix it with quotes or `-dir=`:
 
 ```bash
-cd "/Users/me/My Project/site"   # quoted cd
 ./sgo -dir="/Users/me/My Project/site"
 ```
 
@@ -66,12 +65,19 @@ cd "/Users/me/My Project/site"   # quoted cd
 
 ## macOS
 
-Open Terminal (Cmd + Space, type **Terminal**, Enter). From your Downloads folder (or wherever you placed `sgo`):
+Put `sgo` in the folder you want to serve (for example your project or Downloads). Open Terminal (Cmd + Space, type **Terminal**, Enter):
 
 ```bash
+cd "/path/to/your/site"
 chmod +x ./sgo
 xattr -d com.apple.quarantine ./sgo 2>/dev/null || true
-./sgo -dir="$HOME/My Project/site"
+./sgo
 ```
 
-Replace `My Project/site` with your folder. Use `-dir=` or quotes so spaces in the path are preserved.
+When you launch `sgo` from Finder, macOS sets the working directory to your home folder; sgo still serves the folder where the binary lives. Use `-dir=` when the site is not next to the binary:
+
+```bash
+./sgo -dir="/Users/me/My Project/site"
+```
+
+Use `-dir=` or quotes so spaces in the path are preserved.
