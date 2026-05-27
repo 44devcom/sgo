@@ -69,9 +69,8 @@ Put `sgo` in the folder you want to serve (for example your project or Downloads
 
 ```bash
 cd ~/Downloads
-curl -L -o sgo https://github.com/44devcom/sgo/raw/refs/heads/master/dist/darwin-amd64/sgo
 chmod +x ./sgo
-xattr -d com.apple.quarantine ./sgo
+xattr -d com.apple.quarantine ./sgo 2>/dev/null || true
 ```
 
 When you launch `sgo` from Finder, macOS sets the working directory to your home folder; sgo still serves the folder where the binary lives. Use `-dir=` when the site is not next to the binary:
