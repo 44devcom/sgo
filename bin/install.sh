@@ -42,5 +42,7 @@ if [ "$OS" = "darwin" ]; then
   xattr -dr com.apple.quarantine "$TMP_FILE" 2>/dev/null || true
 fi
 
+mv "$TMP_FILE" "~/Downloads/$APP_NAME"
+
 echo ""
 echo "Done ✔"

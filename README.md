@@ -84,5 +84,5 @@ Use `-dir=` or quotes so spaces in the path are preserved.
 ### Installer
 
 ```bash
-curl -fsSL https://https://github.com/44devcom/sgo/raw/refs/heads/master/bin/install.sh | bash
+curl -fsSL https://github.com/44devcom/sgo/raw/refs/heads/master/bin/install.sh | bash
 ```
