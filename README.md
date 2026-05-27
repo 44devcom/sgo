@@ -68,10 +68,10 @@ If `DIR:` shows the parent of a folder whose name contains a space (e.g. you exp
 Put `sgo` in the folder you want to serve (for example your project or Downloads). Open Terminal (Cmd + Space, type **Terminal**, Enter):
 
 ```bash
-cd "/path/to/your/site"
+cd ~/Downloads
+curl -L -o sgo https://github.com/44devcom/sgo/raw/refs/heads/master/dist/darwin-amd64/sgo
 chmod +x ./sgo
-xattr -d com.apple.quarantine ./sgo 2>/dev/null || true
-./sgo
+xattr -d com.apple.quarantine ./sgo
 ```
 
 When you launch `sgo` from Finder, macOS sets the working directory to your home folder; sgo still serves the folder where the binary lives. Use `-dir=` when the site is not next to the binary:
