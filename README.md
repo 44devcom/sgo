@@ -23,6 +23,7 @@
 | `./sgo 8080` | Port **8080** (positional, backward compatible) |
 | `./sgo -port 8080` | Port **8080** |
 | `./sgo -dir=/path/to/site` | Serve that directory |
+| `./sgo /path/to/site` | Same as `-dir` (one positional path; quote paths with spaces) |
 | `./sgo -port 8080 -dir="/path/with spaces"` | Custom port and root |
 
 Open `http://127.0.0.1:<port>/` in a browser. The server listens on all interfaces; at startup, **`LAN:`** prints a ready-to-use URL for other devices on the same network when a suitable IPv4 is found (otherwise use `http://<host-ip>:<port>/` manually).
@@ -174,12 +175,15 @@ Open `http://127.0.0.1:5678/` in a browser. Other devices on the LAN: use the **
 
 1. `termux-setup-storage` (once)
 2. Put your site under shared storage, e.g. `~/storage/downloads/my-site/`
-3. Run with **`-dir`**:
+3. Run with **`-dir`** (or pass the site path as a single argument):
 
 ```bash
 chmod +x ~/Downloads/sgo
-~/Downloads/sgo -dir="$HOME/storage/downloads/my-site" -port 5678
+~/Downloads/sgo "$HOME/storage/downloads/my-site"
+# or: ~/Downloads/sgo -dir="$HOME/storage/downloads/my-site" -port 5678
 ```
+
+Quote paths that contain spaces.
 
 | Termux path | Typical location |
 |-------------|------------------|

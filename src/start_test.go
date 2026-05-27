@@ -224,9 +224,10 @@ func TestParseConfig(t *testing.T) {
 		{"flag port", []string{"-port", "3000"}, config{port: 3000, dir: ".", dirExplicit: false}, false},
 		{"flag dir", []string{"-dir", "/tmp/foo"}, config{port: 5678, dir: "/tmp/foo", dirExplicit: true}, false},
 		{"dir equals form", []string{"-dir=/tmp/My Project"}, config{port: 5678, dir: "/tmp/My Project", dirExplicit: true}, false},
+		{"positional dir", []string{"/tmp/foo"}, config{port: 5678, dir: "/tmp/foo", dirExplicit: true}, false},
 		{"port and dir flags", []string{"-port", "9000", "-dir", "/srv/www"}, config{port: 9000, dir: "/srv/www", dirExplicit: true}, false},
 		{"invalid port positional", []string{"99999"}, config{}, true},
-		{"positional path without dir flag", []string{"/tmp/My", "Project", "site"}, config{}, true},
+		{"unquoted path splits into multiple args", []string{"/tmp/My", "Project", "site"}, config{}, true},
 		{"unexpected with explicit dir", []string{"-dir", "/tmp", "extra"}, config{}, true},
 	}
 

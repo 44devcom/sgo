@@ -49,6 +49,10 @@ func parseConfig(args []string) (config, error) {
 			}
 			port = p
 			pos = nil
+		} else if !dirExplicit {
+			dir = pos[0]
+			dirExplicit = true
+			pos = nil
 		}
 	}
 
