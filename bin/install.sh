@@ -5,29 +5,42 @@ set -e
 APP_NAME="sgo"
 REPO="44devcom/sgo"
 
-OS="$(uname -s)"
-ARCH="$(uname -m)"
+RAW_OS="$(uname -s)"
+RAW_ARCH="$(uname -m)"
 
 echo "Installing $APP_NAME..."
 
-# Normalize architecture
-if [ "$ARCH" = "x86_64" ]; then
-  ARCH="amd64"
-elif [ "$ARCH" = "arm64" ]; then
-  ARCH="arm64"
-fi
+# Normalize architecture (Linux reports aarch64; Go dist uses arm64)
+case "$RAW_ARCH" in
+  x86_64|amd64) ARCH="amd64" ;;
+  arm64|aarch64) ARCH="arm64" ;;
+  *)
+    echo "Unsupported architecture: $RAW_ARCH"
+    echo "Supported: amd64 (x86_64), arm64 (aarch64). See https://github.com/$REPO#download"
+    exit 1
+    ;;
+esac
 
 # Normalize OS
-if [ "$OS" = "Darwin" ]; then
-  OS="darwin"
-elif [ "$OS" = "Linux" ]; then
-  OS="linux"
-else
-  echo "Unsupported OS: $OS"
-  exit 1
-fi
+case "$RAW_OS" in
+  Darwin) OS="darwin" ;;
+  Linux) OS="linux" ;;
+  *)
+    echo "Unsupported OS: $RAW_OS"
+    exit 1
+    ;;
+esac
 
-URL="https://github.com/$REPO/raw/refs/heads/master/dist/$OS-$ARCH/$APP_NAME"
+DIST_ID="$OS-$ARCH"
+case "$DIST_ID" in
+  linux-amd64|linux-arm64|darwin-amd64|darwin-arm64) ;;
+  *)
+    echo "No binary for $DIST_ID"
+    exit 1
+    ;;
+esac
+
+URL="https://github.com/$REPO/raw/refs/heads/master/dist/$DIST_ID/$APP_NAME"
 
 TMP_FILE="$APP_NAME"
 
@@ -42,7 +55,21 @@ if [ "$OS" = "darwin" ]; then
   xattr -dr com.apple.quarantine "$TMP_FILE" 2>/dev/null || true
 fi
 
-mv "$TMP_FILE" "~/Downloads/$APP_NAME"
+DOWNLOADS_DIR="$HOME/Downloads"
+
+if [ ! -d "$DOWNLOADS_DIR" ]; then
+  if ! mkdir -p "$DOWNLOADS_DIR" 2>/dev/null; then
+    echo "Cannot create Downloads directory: $DOWNLOADS_DIR"
+    exit 1
+  fi
+fi
+
+if [ ! -w "$DOWNLOADS_DIR" ]; then
+  echo "Downloads directory is not writable: $DOWNLOADS_DIR"
+  exit 1
+fi
+
+mv "$TMP_FILE" "$DOWNLOADS_DIR"
 
 echo ""
-echo "Done ✔"
+echo "Done ✔ Saved to: $DOWNLOADS_DIR/$APP_NAME"

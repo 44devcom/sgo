@@ -100,6 +100,10 @@ func resolveRootDir(dir string) (string, error) {
 	return abs, nil
 }
 
+func newFileServer(root string) http.Handler {
+	return http.FileServer(http.Dir(root))
+}
+
 func main() {
 	cfg, err := parseConfig(os.Args[1:])
 	if err != nil {
@@ -120,15 +124,14 @@ func main() {
 	}
 
 	addr := fmt.Sprintf(":%d", cfg.port)
-	url := fmt.Sprintf("http://localhost:%d/", cfg.port)
+	url := fmt.Sprintf("http://127.0.0.1:%d/", cfg.port)
 
 	fmt.Printf("sgo: static file server written in Go\n")
 	fmt.Printf("  DIR: %s\n", root)
-	fmt.Printf("  URL:       %s\n", url)
+	fmt.Printf("  URL: %s\n", url)
 	fmt.Printf("  Press Ctrl+C to stop\n")
 
-	fs := http.FileServer(http.Dir(root))
-	if err := http.ListenAndServe(addr, fs); err != nil {
+	if err := http.ListenAndServe(addr, newFileServer(root)); err != nil {
 		fmt.Fprintf(os.Stderr, "listen on %s: %v\n", addr, err)
 		os.Exit(1)
 	}

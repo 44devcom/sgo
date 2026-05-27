@@ -1,7 +1,12 @@
 package main
 
 import (
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 )
@@ -154,4 +159,245 @@ func TestParseConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func startTestServer(t *testing.T, root string) *httptest.Server {
+	t.Helper()
+	abs, err := resolveRootDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return httptest.NewServer(newFileServer(abs))
+}
+
+func getStatusBody(t *testing.T, rawURL string) (int, string) {
+	t.Helper()
+	resp, err := http.Get(rawURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp.StatusCode, string(body)
+}
+
+func urlPath(segments ...string) string {
+	if len(segments) == 0 {
+		return "/"
+	}
+	parts := make([]string, len(segments))
+	for i, seg := range segments {
+		parts[i] = url.PathEscape(seg)
+	}
+	return "/" + path.Join(parts...)
+}
+
+func TestRuntimeFilesystemChanges(t *testing.T) {
+	t.Run("runtime file change", func(t *testing.T) {
+		root := t.TempDir()
+		hello := filepath.Join(root, "hello.txt")
+		if err := os.WriteFile(hello, []byte("v1"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		srv := startTestServer(t, root)
+		defer srv.Close()
+
+		u := srv.URL + "/hello.txt"
+		code, body := getStatusBody(t, u)
+		if code != http.StatusOK || body != "v1" {
+			t.Fatalf("initial: status=%d body=%q", code, body)
+		}
+
+		if err := os.WriteFile(hello, []byte("v2"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		code, body = getStatusBody(t, u)
+		if code != http.StatusOK || body != "v2" {
+			t.Fatalf("after overwrite: status=%d body=%q", code, body)
+		}
+
+		if err := os.Remove(hello); err != nil {
+			t.Fatal(err)
+		}
+		code, _ = getStatusBody(t, u)
+		if code != http.StatusNotFound {
+			t.Fatalf("after delete: status=%d, want 404", code)
+		}
+	})
+
+	t.Run("runtime content change", func(t *testing.T) {
+		root := t.TempDir()
+		page := filepath.Join(root, "index.html")
+		if err := os.WriteFile(page, []byte("<p>first</p>"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		srv := startTestServer(t, root)
+		defer srv.Close()
+		u := srv.URL + "/index.html"
+
+		changes := []struct {
+			name string
+			body []byte
+		}{
+			{"initial", []byte("<p>first</p>")},
+			{"grow", []byte("<p>first</p><p>added section</p>")},
+			{"shrink", []byte("ok")},
+			{"utf8", []byte("<title>Café — demo</title>")},
+		}
+
+		for i, ch := range changes {
+			if i > 0 {
+				if err := os.WriteFile(page, ch.body, 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			code, got := getStatusBody(t, u)
+			if code != http.StatusOK {
+				t.Fatalf("%s: status=%d, want 200", ch.name, code)
+			}
+			if got != string(ch.body) {
+				t.Fatalf("%s: body=%q, want %q", ch.name, got, string(ch.body))
+			}
+		}
+	})
+
+	t.Run("runtime folder change", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, "index.txt"), []byte("root"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		srv := startTestServer(t, root)
+		defer srv.Close()
+
+		tests := []struct {
+			name string
+			run  func(t *testing.T)
+		}{
+			{
+				name: "add folder with space",
+				run: func(t *testing.T) {
+					dir := filepath.Join(root, "New Folder")
+					if err := os.Mkdir(dir, 0o755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(filepath.Join(dir, "page.html"), []byte("new"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+					u := srv.URL + urlPath("New Folder", "page.html")
+					code, body := getStatusBody(t, u)
+					if code != http.StatusOK || body != "new" {
+						t.Fatalf("status=%d body=%q", code, body)
+					}
+				},
+			},
+			{
+				name: "rename folder",
+				run: func(t *testing.T) {
+					oldDir := filepath.Join(root, "old")
+					if err := os.Mkdir(oldDir, 0o755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(filepath.Join(oldDir, "x.txt"), []byte("x"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+					oldURL := srv.URL + urlPath("old", "x.txt")
+					code, body := getStatusBody(t, oldURL)
+					if code != http.StatusOK || body != "x" {
+						t.Fatalf("before rename: status=%d body=%q", code, body)
+					}
+
+					renamed := filepath.Join(root, "renamed")
+					if err := os.Rename(oldDir, renamed); err != nil {
+						t.Fatal(err)
+					}
+					code, _ = getStatusBody(t, oldURL)
+					if code != http.StatusNotFound {
+						t.Fatalf("old URL after rename: status=%d, want 404", code)
+					}
+					newURL := srv.URL + urlPath("renamed", "x.txt")
+					code, body = getStatusBody(t, newURL)
+					if code != http.StatusOK || body != "x" {
+						t.Fatalf("new URL after rename: status=%d body=%q", code, body)
+					}
+				},
+			},
+			{
+				name: "delete folder",
+				run: func(t *testing.T) {
+					gone := filepath.Join(root, "gone")
+					if err := os.Mkdir(gone, 0o755); err != nil {
+						t.Fatal(err)
+					}
+					if err := os.WriteFile(filepath.Join(gone, "y.txt"), []byte("y"), 0o644); err != nil {
+						t.Fatal(err)
+					}
+					u := srv.URL + urlPath("gone", "y.txt")
+					code, body := getStatusBody(t, u)
+					if code != http.StatusOK || body != "y" {
+						t.Fatalf("before delete: status=%d body=%q", code, body)
+					}
+					if err := os.RemoveAll(gone); err != nil {
+						t.Fatal(err)
+					}
+					code, _ = getStatusBody(t, u)
+					if code != http.StatusNotFound {
+						t.Fatalf("after delete: status=%d, want 404", code)
+					}
+				},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				tt.run(t)
+			})
+		}
+	})
+
+	t.Run("runtime subfolder change", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.WriteFile(filepath.Join(root, "marker.txt"), []byte("up"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+
+		srv := startTestServer(t, root)
+		defer srv.Close()
+
+		nested := filepath.Join(root, "My Project", "sub", "deep")
+		dataFile := filepath.Join(nested, "data.txt")
+		u := srv.URL + urlPath("My Project", "sub", "deep", "data.txt")
+
+		if err := os.MkdirAll(nested, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(dataFile, []byte("v1"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		code, body := getStatusBody(t, u)
+		if code != http.StatusOK || body != "v1" {
+			t.Fatalf("create nested: status=%d body=%q", code, body)
+		}
+
+		if err := os.WriteFile(dataFile, []byte("v2"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		code, body = getStatusBody(t, u)
+		if code != http.StatusOK || body != "v2" {
+			t.Fatalf("modify nested: status=%d body=%q", code, body)
+		}
+
+		if err := os.RemoveAll(filepath.Join(root, "My Project")); err != nil {
+			t.Fatal(err)
+		}
+		code, _ = getStatusBody(t, u)
+		if code != http.StatusNotFound {
+			t.Fatalf("remove nested: status=%d, want 404", code)
+		}
+	})
 }
