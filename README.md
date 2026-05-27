@@ -11,7 +11,7 @@
 - **Change root directory** — serve any path (required on Termux, when `sgo` is on `PATH`, or when the site lives elsewhere)
 - **Listens on all interfaces** — use `127.0.0.1` locally or `<host-ip>` from phones and other machines on the same network
 - **Startup summary** — prints resolved `DIR:`, `URL:`, and `LAN:` (when a LAN IPv4 is found) so you can confirm the right folder and copy a network URL
-- **Cross-platform builds** — Linux (amd64, arm64), macOS (Intel & Apple Silicon), Windows (amd64)
+- **Cross-platform builds** — Linux (amd64, arm64), Android/Termux (arm64), macOS (Intel & Apple Silicon), Windows (amd64)
 
 ---
 
@@ -35,6 +35,18 @@ Check the **`DIR:`** line at startup. If a path with spaces was split (e.g. you 
 
 On macOS and in most shells, prefer **`-dir=/full/path`** (equals form) so the path is not split before sgo runs.
 
+Example startup output:
+
+```
+sgo: static file server written in Go
+  DIR: /path/to/site
+  URL: http://127.0.0.1:5678/
+  LAN: http://192.168.1.42:5678/
+  Press Ctrl+C to stop
+```
+
+`LAN:` is omitted when no suitable LAN IPv4 is found.
+
 ---
 
 ## Install
@@ -43,7 +55,7 @@ Install scripts download the binary for your OS and CPU, then place it in your D
 
 ### Linux & macOS
 
-Detects `x86_64` → amd64 and `aarch64` → arm64. Saves `~/Downloads/sgo`.
+Detects `x86_64` → amd64 and `aarch64` → arm64 (Linux or macOS). On Termux, uses the Android arm64 binary instead of `linux-arm64`. Saves `~/Downloads/sgo`.
 
 ```bash
 curl -fsSL https://github.com/44devcom/sgo/raw/refs/heads/master/bin/install.sh | bash
@@ -79,7 +91,7 @@ cd $env:USERPROFILE\Downloads
 .\sgo.exe -port 8080
 ```
 
-**Termux (Android)** — use the **Linux & macOS** installer inside Termux (same script; Termux is Linux + aarch64 → `linux-arm64` binary):
+**Termux (Android)** — use the **Linux & macOS** installer inside Termux (detects Termux and downloads `android-arm64` for Bionic):
 
 ```bash
 curl -fsSL https://github.com/44devcom/sgo/raw/refs/heads/master/bin/install.sh | bash
@@ -98,6 +110,7 @@ Pre-built binaries in `dist/` (also linked per platform below):
 |----------|----------|
 | Linux amd64 | `dist/linux-amd64/sgo` |
 | Linux arm64 (aarch64) | `dist/linux-arm64/sgo` |
+| Android / Termux arm64 | `dist/android-arm64/sgo` |
 | macOS Intel | `dist/darwin-amd64/sgo` |
 | macOS Apple Silicon | `dist/darwin-arm64/sgo` |
 | Windows amd64 | `dist/windows-amd64/sgo.exe` |
@@ -115,7 +128,7 @@ chmod +x sgo
 ./sgo -port 8080 -dir=/var/www/myproject
 ```
 
-Place `sgo` next to your site files, or use `-dir`. Open `http://127.0.0.1:5678/` (or your chosen port). From another device: `http://<machine-ip>:5678/`.
+Place `sgo` next to your site files, or use `-dir`. Open `http://127.0.0.1:5678/` (or your chosen port). From another device on the LAN, use the **`LAN:`** line from startup, or `http://<machine-ip>:5678/`.
 
 ---
 
@@ -157,7 +170,7 @@ Open `http://127.0.0.1:5678/` in a browser. Other devices on the LAN: use the **
 
 ### Termux (Android)
 
-**Download:** [linux-arm64/sgo](https://github.com/44devcom/sgo/raw/refs/heads/master/dist/linux-arm64/sgo) (or use the [installer](#install) above). The arm64 Linux build is a **PIE** binary (`-buildmode=pie`) so Android accepts it — older builds may fail with `unexpected e_type: 2`.
+**Download:** [android-arm64/sgo](https://github.com/44devcom/sgo/raw/refs/heads/master/dist/android-arm64/sgo) (or use the [installer](#install) above). Use the **Android** build on Termux — the generic `linux-arm64` binary can fail with `TLS segment is underaligned` on ARM64 Bionic. If you already have a broken `linux-arm64` copy, run `termux-elf-cleaner sgo` or re-download `android-arm64`.
 
 1. `termux-setup-storage` (once)
 2. Put your site under shared storage, e.g. `~/storage/downloads/my-site/`
@@ -174,8 +187,10 @@ chmod +x ~/Downloads/sgo
 | `~/storage/shared` | Internal storage root |
 | `~/storage/documents` | Documents |
 
-- On the phone: `http://127.0.0.1:5678/`
-- From another device on Wi‑Fi: `http://<phone-ip>:5678/`
+- On the phone: `http://127.0.0.1:5678/` (or the **`URL:`** line)
+- From another device on Wi‑Fi: use the **`LAN:`** line, or `http://<phone-ip>:5678/`
+
+**Note:** Do not use `dist/linux-arm64/sgo` on Termux — use `android-arm64` or the installer. The Linux arm64 build is for native Linux devices (e.g. Raspberry Pi).
 
 ---
 
@@ -188,4 +203,15 @@ go test ./...
 ./bin/build.sh
 ```
 
-`build.sh` runs tests first, then cross-compiles all `dist/` targets with `CGO_ENABLED=0`. Builds are skipped if tests fail.
+`build.sh` runs tests first, then cross-compiles all `dist/` targets with `CGO_ENABLED=0`:
+
+| Output | `GOOS` / `GOARCH` | Notes |
+|--------|-------------------|--------|
+| `dist/linux-amd64/sgo` | linux / amd64 | |
+| `dist/linux-arm64/sgo` | linux / arm64 | native Linux ARM64 |
+| `dist/android-arm64/sgo` | android / arm64 | Termux / Bionic |
+| `dist/darwin-amd64/sgo` | darwin / amd64 | |
+| `dist/darwin-arm64/sgo` | darwin / arm64 | |
+| `dist/windows-amd64/sgo.exe` | windows / amd64 | |
+
+Builds are skipped if tests fail.
